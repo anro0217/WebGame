@@ -11,14 +11,13 @@
             font-family: Arial, sans-serif;
             color: white;
             position: relative;
-            z-index: 0; /* Z-index beállítás a kattinthatóság érdekében */
         }
         #gameContainer {
             position: relative;
             width: 100%;
             height: 100vh;
             overflow: hidden;
-            z-index: 1; /* A játékterület z-index beállítása */
+            display: none; /* Kezdetben rejtve */
         }
         .player {
             position: absolute;
@@ -34,7 +33,15 @@
             position: absolute;
             top: 10px;
             left: 10px;
-            z-index: 2; /* A vezérlők z-index beállítása */
+        }
+        #lobby {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
         }
     </style>
 </head>
@@ -43,6 +50,11 @@
         <button id="newGame">Új Játék</button>
         <input type="text" id="joinCode" placeholder="Játék kód">
         <button id="joinGame">Csatlakozás</button>
+    </div>
+    <div id="lobby" style="display: none;">
+        <h2>Lobby</h2>
+        <p>Várakozás a játékosokra...</p>
+        <button id="startGame">Játék Indítása</button>
     </div>
     <div id="gameContainer"></div>
 
@@ -62,14 +74,17 @@
         const players = {};
         const walls = [];
         const gameContainer = document.getElementById('gameContainer');
+        const lobby = document.getElementById('lobby');
         
         document.getElementById('newGame').addEventListener('click', createNewGame);
         document.getElementById('joinGame').addEventListener('click', joinGame);
+        document.getElementById('startGame').addEventListener('click', startGameFromLobby);
 
         function createNewGame() {
             currentGameId = generateGameId();
             db.ref(`games/${currentGameId}`).set({ players: {} });
             alert(`Új játék létrehozva! Kód: ${currentGameId}`);
+            enterLobby(); // Belépés a lobbyba
         }
 
         function joinGame() {
@@ -77,19 +92,40 @@
             db.ref(`games/${code}`).once('value').then(snapshot => {
                 if (snapshot.exists()) {
                     currentGameId = code;
-                    startGame();
+                    enterLobby(); // Belépés a lobbyba
                 } else {
                     alert('A megadott játék kód nem létezik.');
                 }
             });
         }
 
-        function startGame() {
+        function enterLobby() {
+            document.getElementById('controls').style.display = 'none'; // Vezérlők elrejtése
+            lobby.style.display = 'block'; // Lobby megjelenítése
+            listenForPlayers(); // Játékosok figyelése
+        }
+
+        function listenForPlayers() {
+            db.ref(`games/${currentGameId}/players`).on('value', (snapshot) => {
+                const playerNames = [];
+                snapshot.forEach(playerSnapshot => {
+                    playerNames.push(playerSnapshot.key);
+                });
+                lobby.querySelector('p').innerText = `Játékosok: ${playerNames.join(', ')}`;
+            });
+        }
+
+        function startGameFromLobby() {
             const username = prompt("Add meg a felhasználóneved:");
             playerId = Date.now();
             players[username] = { id: playerId, position: { x: 50, y: 50 } };
             db.ref(`games/${currentGameId}/players/${username}`).set(players[username]);
+            lobby.style.display = 'none'; // Lobby elrejtése
+            gameContainer.style.display = 'block'; // Játék területének megjelenítése
+            startGame();
+        }
 
+        function startGame() {
             db.ref(`games/${currentGameId}/players`).on('value', (snapshot) => {
                 gameContainer.innerHTML = ''; // Törli a régi játékosokat
                 snapshot.forEach(playerSnapshot => {
