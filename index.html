@@ -23,7 +23,6 @@
             position: absolute;
             width: 20px;
             height: 20px;
-            background-color: rgba(0, 255, 0, 0.5);
         }
         .wall {
             position: absolute;
@@ -53,7 +52,8 @@
     </div>
     <div id="lobby" style="display: none;">
         <h2>Lobby</h2>
-        <p>Várakozás a játékosokra...</p>
+        <p id="lobbyPlayers">Várakozás a játékosokra...</p>
+        <p id="gameCode"></p> <!-- Játék kód megjelenítése -->
         <button id="startGame">Játék Indítása</button>
     </div>
     <div id="gameContainer"></div>
@@ -83,7 +83,7 @@
         function createNewGame() {
             currentGameId = generateGameId();
             db.ref(`games/${currentGameId}`).set({ players: {} });
-            alert(`Új játék létrehozva! Kód: ${currentGameId}`);
+            document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`; // Kód megjelenítése
             enterLobby(); // Belépés a lobbyba
         }
 
@@ -92,6 +92,7 @@
             db.ref(`games/${code}`).once('value').then(snapshot => {
                 if (snapshot.exists()) {
                     currentGameId = code;
+                    document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`; // Kód megjelenítése
                     enterLobby(); // Belépés a lobbyba
                 } else {
                     alert('A megadott játék kód nem létezik.');
@@ -109,16 +110,18 @@
             db.ref(`games/${currentGameId}/players`).on('value', (snapshot) => {
                 const playerNames = [];
                 snapshot.forEach(playerSnapshot => {
-                    playerNames.push(playerSnapshot.key);
+                    const playerData = playerSnapshot.val();
+                    playerNames.push(`${playerSnapshot.key} (szín: ${playerData.color})`);
                 });
-                lobby.querySelector('p').innerText = `Játékosok: ${playerNames.join(', ')}`;
+                document.getElementById('lobbyPlayers').innerText = `Játékosok: ${playerNames.join(', ')}`;
             });
         }
 
         function startGameFromLobby() {
             const username = prompt("Add meg a felhasználóneved:");
+            const color = getRandomColor(); // Véletlenszerű szín generálása
             playerId = Date.now();
-            players[username] = { id: playerId, position: { x: 50, y: 50 } };
+            players[username] = { id: playerId, position: { x: 50, y: 50 }, color: color };
             db.ref(`games/${currentGameId}/players/${username}`).set(players[username]);
             lobby.style.display = 'none'; // Lobby elrejtése
             gameContainer.style.display = 'block'; // Játék területének megjelenítése
@@ -126,20 +129,20 @@
         }
 
         function startGame() {
+            generateMaze(); // Labirintus generálás
             db.ref(`games/${currentGameId}/players`).on('value', (snapshot) => {
                 gameContainer.innerHTML = ''; // Törli a régi játékosokat
                 snapshot.forEach(playerSnapshot => {
                     const playerData = playerSnapshot.val();
-                    createPlayer(playerData.position.x, playerData.position.y);
+                    createPlayer(playerData.position.x, playerData.position.y, playerData.color);
                 });
             });
 
-            generateMaze();
             document.addEventListener('keydown', handleKeyPress);
         }
 
         function generateMaze() {
-            // Labirintus generálás (itt csak egy egyszerű példa, valóságbeli algoritmust használj)
+            // Egyszerű labirintus generálás algoritmus
             for (let i = 0; i < 10; i++) {
                 for (let j = 0; j < 10; j++) {
                     if (Math.random() < 0.2) { // 20% eséllyel fal
@@ -154,11 +157,21 @@
                     }
                 }
             }
+            // Kijutási pont hozzáadása
+            const exit = document.createElement('div');
+            exit.classList.add('wall');
+            exit.style.width = '20px';
+            exit.style.height = '20px';
+            exit.style.left = `180px`; // Kijutási koordináták
+            exit.style.top = `180px`;
+            gameContainer.appendChild(exit);
+            walls.push({ x: 180, y: 180 });
         }
 
-        function createPlayer(x, y) {
+        function createPlayer(x, y, color) {
             const playerDiv = document.createElement('div');
             playerDiv.classList.add('player');
+            playerDiv.style.backgroundColor = color; // Játékos szín
             playerDiv.style.left = `${x}px`;
             playerDiv.style.top = `${y}px`;
             gameContainer.appendChild(playerDiv);
@@ -203,22 +216,20 @@
             if (!collision) {
                 player.position = newPosition;
                 db.ref(`games/${currentGameId}/players/${username}`).set(player);
-                gameContainer.innerHTML = ''; // Törli a régi játékost
-                createPlayer(newPosition.x, newPosition.y);
             }
-            checkWinCondition(newPosition);
         }
 
-        function checkWinCondition(position) {
-            // Kijutás ellenőrzése (pl. ha a position.x, position.y a kijutási pont)
-            if (position.x === 180 && position.y === 180) { // Példa kijutási koordináták
-                alert('Gratulálunk! Győztél!');
-                // Itt lehetne új játékot indítani, ha a gombot megnyomják
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
             }
+            return color;
         }
 
         function generateGameId() {
-            return Math.random().toString(36).substring(2, 8); // Egyszerű kód generálás
+            return Math.random().toString(36).substr(2, 5); // Rövid játék kód generálása
         }
     </script>
 </body>
