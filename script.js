@@ -16,12 +16,20 @@ document.getElementById('startGame').addEventListener('click', startGameFromLobb
 
 function createNewGame() {
     const username = document.getElementById('username').value;
+    console.log('Új játék létrehozása...'); // Debug üzenet
     currentGameId = generateGameId();
-    db.ref(`games/${currentGameId}`).set({ players: {}, started: false, creator: username });
-    document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
-    enterLobby();
-    addPlayerToLobby(username);
+    db.ref(`games/${currentGameId}`).set({ players: {}, started: false, creator: username })
+        .then(() => {
+            console.log('Játék létrehozva, kód:', currentGameId);
+            document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
+            enterLobby();
+            addPlayerToLobby(username);
+        })
+        .catch(error => {
+            console.error('Hiba a játék létrehozásakor:', error);
+        });
 }
+
 
 function joinGame() {
     const code = document.getElementById('joinCode').value;
