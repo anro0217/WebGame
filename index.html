@@ -10,13 +10,14 @@
             background-color: #1d1f21;
             font-family: Arial, sans-serif;
             color: white;
-            position: relative;
         }
         #gameContainer {
             position: relative;
             width: 100%;
             height: 100vh;
-            overflow: hidden;
+            max-width: 800px;
+            max-height: 800px;
+            margin: 0 auto;
             display: none;
         }
         .player {
@@ -43,9 +44,12 @@
             border-radius: 10px;
         }
         #playerList {
-            position: absolute;
+            position: fixed;
             top: 10px;
-            right: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
         }
     </style>
 </head>
@@ -88,8 +92,10 @@
         function createNewGame() {
             currentGameId = generateGameId();
             db.ref(`games/${currentGameId}`).set({ players: {} });
+            const username = document.getElementById('username').value;
             document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
             enterLobby();
+            addPlayerToLobby(username);
         }
 
         function joinGame() {
@@ -99,6 +105,8 @@
                     currentGameId = code;
                     document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
                     enterLobby();
+                    const username = document.getElementById('username').value;
+                    addPlayerToLobby(username);
                 } else {
                     alert('A megadott játék kód nem létezik.');
                 }
@@ -106,14 +114,16 @@
         }
 
         function enterLobby() {
-            const username = document.getElementById('username').value;
-            if (!username) {
-                alert('Kérlek, add meg a felhasználóneved!');
-                return;
-            }
             document.getElementById('controls').style.display = 'none';
             lobby.style.display = 'block';
             listenForPlayers();
+        }
+
+        function addPlayerToLobby(username) {
+            const color = getRandomColor();
+            playerId = Date.now();
+            players[username] = { id: playerId, position: { x: 50, y: 50 }, color: color };
+            db.ref(`games/${currentGameId}/players/${username}`).set(players[username]);
         }
 
         function listenForPlayers() {
@@ -128,15 +138,6 @@
         }
 
         function startGameFromLobby() {
-            const username = document.getElementById('username').value;
-            if (!username) {
-                alert('Kérlek, add meg a felhasználóneved!');
-                return;
-            }
-            const color = getRandomColor();
-            playerId = Date.now();
-            players[username] = { id: playerId, position: { x: 50, y: 50 }, color: color };
-            db.ref(`games/${currentGameId}/players/${username}`).set(players[username]);
             lobby.style.display = 'none';
             gameContainer.style.display = 'block';
             startGame();
@@ -151,7 +152,7 @@
                     const playerData = playerSnapshot.val();
                     createPlayer(playerData.position.x, playerData.position.y, playerData.color);
                     const playerName = document.createElement('p');
-                    playerName.innerText = `${playerSnapshot.key} - ${playerData.color}`;
+                    playerName.innerText = `${playerSnapshot.key} - Szín: ${playerData.color}`;
                     playerList.appendChild(playerName);
                 });
             });
@@ -228,16 +229,16 @@
         function movePlayer(direction) {
             const username = Object.keys(players)[0];
             const player = players[username];
-            const newPosition = {
-                x: player.position.x + direction.x,
-                y: player.position.y + direction.y
-            };
+            const newPosition = { x: player.position.x + direction.x, y: player.position.y + direction.y };
 
-            const collision = walls.some(wall => wall.x === newPosition.x && wall.y === newPosition.y);
-            if (!collision) {
+            if (!walls.some(wall => wall.x === newPosition.x && wall.y === newPosition.y)) {
                 player.position = newPosition;
-                db.ref(`games/${currentGameId}/players/${username}`).set(player);
+                db.ref(`games/${currentGameId}/players/${username}`).update({ position: newPosition });
             }
+        }
+
+        function generateGameId() {
+            return Math.random().toString(36).substr(2, 6);
         }
 
         function getRandomColor() {
@@ -247,10 +248,6 @@
                 color += letters[Math.floor(Math.random() * 16)];
             }
             return color;
-        }
-
-        function generateGameId() {
-            return Math.random().toString(36).substr(2, 5);
         }
     </script>
 </body>
