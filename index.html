@@ -104,6 +104,16 @@
         document.getElementById('newGame').addEventListener('click', createNewGame);
         document.getElementById('joinGame').addEventListener('click', joinGame);
         document.getElementById('startGame').addEventListener('click', startGameFromLobby);
+        document.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        if (document.getElementById('username').value && document.getElementById('joinCode').value) {
+            joinGame(); // Csatlakozás gomb funkció
+        } else {
+            createNewGame(); // Új játék gomb funkció
+        }
+    }
+});
+
 
         function createNewGame() {
             const username = document.getElementById('username').value;
@@ -166,17 +176,17 @@
         }
 
         function startGameFromLobby() {
-            if (currentGameId) {
-                db.ref(`games/${currentGameId}`).update({ started: true })
-                    .then(() => {
-                        console.log('A játék elindult.');
-                        redirectAllPlayersToGame();
-                    })
-                    .catch((error) => {
-                        console.error('Hiba a játék indításakor:', error);
-                    });
-            }
-        }
+    if (currentGameId) {
+        db.ref(`games/${currentGameId}`).update({ started: true })
+            .then(() => {
+                console.log('A játék elindult.');
+                redirectAllPlayersToGame();
+            })
+            .catch((error) => {
+                console.error('Hiba a játék indításakor:', error);
+            });
+    }
+}
 
         function redirectAllPlayersToGame() {
     db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
@@ -193,15 +203,16 @@
     listenForGameStart();
 }
 
-        function listenForGameStart() {
-            db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
-                const gameData = snapshot.val();
-                if (gameData && gameData.started) {
-                    console.log('A játék elkezdődött');
-                    loadAllPlayers(); // Minden játékos állapotának betöltése
-                }
-            });
+  function listenForGameStart() {
+    db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
+        const gameData = snapshot.val();
+        if (gameData && gameData.started) {
+            console.log('A játék elkezdődött');
+            loadAllPlayers(); // Minden játékos állapotának betöltése
+            alert('A játék elindult!'); // Értesítés a játékosoknak
         }
+    });
+}
 
         function loadAllPlayers() {
     db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
