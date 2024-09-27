@@ -17,7 +17,7 @@
             width: 100%;
             height: 100vh;
             overflow: hidden;
-            display: none; /* Kezdetben rejtve */
+            display: none;
         }
         .player {
             position: absolute;
@@ -42,10 +42,16 @@
             padding: 20px;
             border-radius: 10px;
         }
+        #playerList {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
     </style>
 </head>
 <body>
     <div id="controls">
+        <input type="text" id="username" placeholder="Felhasználónév">
         <button id="newGame">Új Játék</button>
         <input type="text" id="joinCode" placeholder="Játék kód">
         <button id="joinGame">Csatlakozás</button>
@@ -53,19 +59,17 @@
     <div id="lobby" style="display: none;">
         <h2>Lobby</h2>
         <p id="lobbyPlayers">Várakozás a játékosokra...</p>
-        <p id="gameCode"></p> <!-- Játék kód megjelenítése -->
+        <p id="gameCode"></p>
         <button id="startGame">Játék Indítása</button>
     </div>
+    <div id="playerList"></div>
     <div id="gameContainer"></div>
 
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script type="module">
         import firebaseConfig from './firebaseConfig.js';
-
-        // Firebase inicializálása
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
@@ -75,7 +79,8 @@
         const walls = [];
         const gameContainer = document.getElementById('gameContainer');
         const lobby = document.getElementById('lobby');
-        
+        const playerList = document.getElementById('playerList');
+
         document.getElementById('newGame').addEventListener('click', createNewGame);
         document.getElementById('joinGame').addEventListener('click', joinGame);
         document.getElementById('startGame').addEventListener('click', startGameFromLobby);
@@ -83,8 +88,8 @@
         function createNewGame() {
             currentGameId = generateGameId();
             db.ref(`games/${currentGameId}`).set({ players: {} });
-            document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`; // Kód megjelenítése
-            enterLobby(); // Belépés a lobbyba
+            document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
+            enterLobby();
         }
 
         function joinGame() {
@@ -92,8 +97,8 @@
             db.ref(`games/${code}`).once('value').then(snapshot => {
                 if (snapshot.exists()) {
                     currentGameId = code;
-                    document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`; // Kód megjelenítése
-                    enterLobby(); // Belépés a lobbyba
+                    document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
+                    enterLobby();
                 } else {
                     alert('A megadott játék kód nem létezik.');
                 }
@@ -101,9 +106,14 @@
         }
 
         function enterLobby() {
-            document.getElementById('controls').style.display = 'none'; // Vezérlők elrejtése
-            lobby.style.display = 'block'; // Lobby megjelenítése
-            listenForPlayers(); // Játékosok figyelése
+            const username = document.getElementById('username').value;
+            if (!username) {
+                alert('Kérlek, add meg a felhasználóneved!');
+                return;
+            }
+            document.getElementById('controls').style.display = 'none';
+            lobby.style.display = 'block';
+            listenForPlayers();
         }
 
         function listenForPlayers() {
@@ -118,23 +128,31 @@
         }
 
         function startGameFromLobby() {
-            const username = prompt("Add meg a felhasználóneved:");
-            const color = getRandomColor(); // Véletlenszerű szín generálása
+            const username = document.getElementById('username').value;
+            if (!username) {
+                alert('Kérlek, add meg a felhasználóneved!');
+                return;
+            }
+            const color = getRandomColor();
             playerId = Date.now();
             players[username] = { id: playerId, position: { x: 50, y: 50 }, color: color };
             db.ref(`games/${currentGameId}/players/${username}`).set(players[username]);
-            lobby.style.display = 'none'; // Lobby elrejtése
-            gameContainer.style.display = 'block'; // Játék területének megjelenítése
+            lobby.style.display = 'none';
+            gameContainer.style.display = 'block';
             startGame();
         }
 
         function startGame() {
-            generateMaze(); // Labirintus generálás
+            generateMaze();
             db.ref(`games/${currentGameId}/players`).on('value', (snapshot) => {
-                gameContainer.innerHTML = ''; // Törli a régi játékosokat
+                gameContainer.innerHTML = '';
+                playerList.innerHTML = '';
                 snapshot.forEach(playerSnapshot => {
                     const playerData = playerSnapshot.val();
                     createPlayer(playerData.position.x, playerData.position.y, playerData.color);
+                    const playerName = document.createElement('p');
+                    playerName.innerText = `${playerSnapshot.key} - ${playerData.color}`;
+                    playerList.appendChild(playerName);
                 });
             });
 
@@ -142,10 +160,14 @@
         }
 
         function generateMaze() {
-            // Egyszerű labirintus generálás algoritmus
+            gameContainer.style.display = 'block';
+            gameContainer.style.position = 'relative';
+            gameContainer.style.left = `calc(50% - 100px)`;
+            gameContainer.style.top = `calc(50% - 100px)`;
+
             for (let i = 0; i < 10; i++) {
                 for (let j = 0; j < 10; j++) {
-                    if (Math.random() < 0.2) { // 20% eséllyel fal
+                    if (Math.random() < 0.2) {
                         const wall = document.createElement('div');
                         wall.classList.add('wall');
                         wall.style.width = '20px';
@@ -157,12 +179,12 @@
                     }
                 }
             }
-            // Kijutási pont hozzáadása
+
             const exit = document.createElement('div');
             exit.classList.add('wall');
             exit.style.width = '20px';
             exit.style.height = '20px';
-            exit.style.left = `180px`; // Kijutási koordináták
+            exit.style.left = `180px`;
             exit.style.top = `180px`;
             gameContainer.appendChild(exit);
             walls.push({ x: 180, y: 180 });
@@ -171,7 +193,7 @@
         function createPlayer(x, y, color) {
             const playerDiv = document.createElement('div');
             playerDiv.classList.add('player');
-            playerDiv.style.backgroundColor = color; // Játékos szín
+            playerDiv.style.backgroundColor = color;
             playerDiv.style.left = `${x}px`;
             playerDiv.style.top = `${y}px`;
             gameContainer.appendChild(playerDiv);
@@ -197,21 +219,20 @@
                     direction.x = 20;
                     break;
                 default:
-                    return; // Nem kezeli más billentyűt
+                    return;
             }
 
             movePlayer(direction);
         }
 
         function movePlayer(direction) {
-            const username = Object.keys(players)[0]; // Az első játékos (jelenleg egy játékos)
+            const username = Object.keys(players)[0];
             const player = players[username];
             const newPosition = {
                 x: player.position.x + direction.x,
                 y: player.position.y + direction.y
             };
 
-            // Ellenőrzés, hogy nem ütközik falba
             const collision = walls.some(wall => wall.x === newPosition.x && wall.y === newPosition.y);
             if (!collision) {
                 player.position = newPosition;
@@ -229,7 +250,7 @@
         }
 
         function generateGameId() {
-            return Math.random().toString(36).substr(2, 5); // Rövid játék kód generálása
+            return Math.random().toString(36).substr(2, 5);
         }
     </script>
 </body>
