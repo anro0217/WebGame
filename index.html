@@ -3,20 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Játék</title>
+    <title>Multiplayer Labirintus Játék</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Üdvözöljük a Web Játékban!</h1>
+    <div id="controls">
         <input type="text" id="username" placeholder="Felhasználónév" required>
-        <input type="text" id="gameCode" placeholder="Csatlakozási kód" required>
-        <button id="joinGame">Csatlakozás meglévő játékhoz</button>
-        <button id="createGame">Új játék létrehozása</button>
+        <button id="newGame">Új Játék</button>
+        <input type="text" id="joinCode" placeholder="Játék kód" required>
+        <button id="joinGame">Csatlakozás</button>
     </div>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
-    <script src="firebaseConfig.js"></script>
-    <script src="script.js"></script>
+    <div id="lobby" style="display: none;">
+        <h2>Lobby</h2>
+        <p id="lobbyPlayers">Várakozás a játékosokra...</p>
+        <p id="gameCode"></p>
+        <button id="startGame" style="display: none;">Játék Indítása</button>
+    </div>
+    <div id="playerList"></div>
+    <div id="gameContainer" style="display: none;"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
