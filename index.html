@@ -27,7 +27,7 @@
             height: 20px;
             background-color: #00ff00;
             bottom: 0;
-            transition: bottom 0.2s ease;
+            transition: bottom 0.2s ease, height 0.2s ease;
         }
         .ground {
             position: absolute;
@@ -222,78 +222,44 @@
                 const obstacle = document.createElement('div');
                 obstacle.classList.add('obstacle');
                 obstacle.style.width = `${Math.random() * 40 + 20}px`;
-                obstacle.style.height = '20px';
+                obstacle.style.height = Math.random() > 0.5 ? '20px' : '10px'; // Változó magasságú akadályok
                 obstacle.style.bottom = '20px';
                 obstacle.style.left = '800px'; // Kezdeti pozíció
                 gameContainer.appendChild(obstacle);
-            }, 3000); // 3 másodpercenként új akadály
-        }
-
-        function createPlayer(username) {
-            const playerDiv = document.createElement('div');
-            playerDiv.classList.add('player');
-            playerDiv.id = username; // A játékos nevét használjuk az azonosításhoz
-            playerDiv.style.left = '50px';
-            gameContainer.appendChild(playerDiv);
+            }, 2000); // Minden 2 másodpercben új akadály
         }
 
         function handleKeyPress(event) {
-            const player = players[Object.keys(players)[0]]; // Az első játékos adatai
-            switch (event.key) {
-                case 'ArrowUp':
-                    jumpPlayer(player);
-                    break;
-                case 'ArrowDown':
-                    crouchPlayer(player);
-                    break;
+            const player = document.querySelector('.player');
+            if (event.key === 'ArrowUp') {
+                player.style.bottom = '60px'; // Ugrás
+                setTimeout(() => { player.style.bottom = '0px'; }, 300); // Visszaesés
+            } else if (event.key === 'ArrowDown') {
+                player.style.height = '10px'; // Guggolás
+                setTimeout(() => { player.style.height = '20px'; }, 300); // Visszaállás
             }
         }
 
-        function jumpPlayer(player) {
-            const playerDiv = document.getElementById(Object.keys(players)[0]); // Az első játékos div-je
-            playerDiv.style.bottom = '60px'; // Ugrás magassága
-            setTimeout(() => {
-                playerDiv.style.bottom = '20px'; // Visszatérés a földre
-            }, 500);
+        function createPlayer(username) {
+            const player = document.createElement('div');
+            player.classList.add('player');
+            player.style.left = '50%'; // Középen kezd
+            player.style.backgroundColor = getRandomColor();
+            gameContainer.appendChild(player);
+            players[username] = player;
         }
 
-        function crouchPlayer(player) {
-            const playerDiv = document.getElementById(Object.keys(players)[0]); // Az első játékos div-je
-            playerDiv.style.height = '10px'; // Guggolás magassága
-            setTimeout(() => {
-                playerDiv.style.height = '20px'; // Visszaállás eredeti magasságra
-            }, 500);
-        }
-
-        // Ütközések ellenőrzése
-        function checkCollisions() {
-            const obstacles = document.getElementsByClassName('obstacle');
-            const playerDiv = document.getElementById(Object.keys(players)[0]);
-            const playerRect = playerDiv.getBoundingClientRect();
-
-            for (let obstacle of obstacles) {
-                const obstacleRect = obstacle.getBoundingClientRect();
-                if (
-                    playerRect.x < obstacleRect.x + obstacleRect.width &&
-                    playerRect.x + playerRect.width > obstacleRect.x &&
-                    playerRect.y < obstacleRect.y + obstacleRect.height &&
-                    playerRect.y + playerRect.height > obstacleRect.y
-                ) {
-                    alert('Ütközés! A játék véget ért.');
-                    resetGame();
-                    break;
-                }
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
             }
+            return color;
         }
 
-        function resetGame() {
-            document.location.reload(); // Újraindítja a játékot
-        }
-
-        // Ütközések ellenőrzése folyamatosan
-        setInterval(checkCollisions, 100); // 100ms-enként ellenőrzi az ütközéseket
         function generateGameId() {
-            return Math.random().toString(36).substr(2, 5); // Generál egy 5 karakteres játék kódot
+            return Math.random().toString(36).substr(2, 6);
         }
     </script>
 </body>
