@@ -3,32 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Labirintus Játék</title>
+    <title>Multiplayer Ugráló Játék</title>
     <style>
         body {
             margin: 0;
             background-color: #1d1f21;
             font-family: Arial, sans-serif;
             color: white;
-            overflow: hidden; /* Ne legyen görgetés */
+            overflow: hidden;
         }
         #gameContainer {
             position: relative;
             width: 100%;
             height: 100vh;
             max-width: 800px;
-            max-height: 800px;
             margin: 0 auto;
             display: none;
+            overflow: hidden;
         }
         .player {
             position: absolute;
             width: 20px;
             height: 20px;
+            background-color: #00ff00;
+            bottom: 0;
+            transition: bottom 0.2s ease;
         }
-        .wall {
+        .ground {
             position: absolute;
-            background-color: rgba(255, 0, 0, 0.5);
+            width: 100%;
+            height: 20px;
+            background-color: #654321;
+            bottom: 0;
+        }
+        .obstacle {
+            position: absolute;
+            background-color: rgba(255, 0, 0, 0.7);
+            animation: moveObstacle 5s linear infinite;
+        }
+        @keyframes moveObstacle {
+            from { transform: translateX(800px); }
+            to { transform: translateX(-100px); }
         }
         #controls {
             position: absolute;
@@ -68,7 +83,9 @@
         <button id="startGame" style="display: none;">Játék Indítása</button>
     </div>
     <div id="playerList"></div>
-    <div id="gameContainer"></div>
+    <div id="gameContainer">
+        <div class="ground"></div>
+    </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -81,10 +98,8 @@
         let playerId = null;
         let currentGameId = null;
         const players = {};
-        const walls = [];
         const gameContainer = document.getElementById('gameContainer');
         const lobby = document.getElementById('lobby');
-        const playerList = document.getElementById('playerList');
 
         document.getElementById('newGame').addEventListener('click', createNewGame);
         document.getElementById('joinGame').addEventListener('click', joinGame);
@@ -134,9 +149,8 @@
         }
 
         function addPlayerToLobby(username) {
-            const color = getRandomColor();
             playerId = Date.now();
-            players[username] = { id: playerId, position: { x: 50, y: 50 }, color: color, inGame: false };
+            players[username] = { id: playerId, position: { x: 50, y: 0 }, inGame: false };
             db.ref(`games/${currentGameId}/players/${username}`).set(players[username]);
         }
 
@@ -145,7 +159,7 @@
                 const playerNames = [];
                 snapshot.forEach(playerSnapshot => {
                     const playerData = playerSnapshot.val();
-                    playerNames.push(`${playerSnapshot.key} (szín: ${playerData.color})`);
+                    playerNames.push(playerSnapshot.key);
                 });
                 document.getElementById('lobbyPlayers').innerText = `Játékosok: ${playerNames.join(', ')}`;
             });
@@ -169,7 +183,6 @@
                 snapshot.forEach(playerSnapshot => {
                     const username = playerSnapshot.key;
                     db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true });
-                    loadAllPlayers(username); // Minden játékos átirányítása a játék felületére
                 });
             });
             listenForGameStart();
@@ -185,116 +198,102 @@
             });
         }
 
-        function loadAllPlayers(username) {
+        function loadAllPlayers() {
             db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
                 snapshot.forEach(playerSnapshot => {
                     const playerData = playerSnapshot.val();
                     if (playerData.inGame) {
-                        createPlayer(playerData.position.x, playerData.position.y, playerData.color);
+                        createPlayer(playerSnapshot.key);
                     }
                 });
-                lobby.style.display = 'none'; 
-                gameContainer.style.display = 'block'; 
+                lobby.style.display = 'none';
+                gameContainer.style.display = 'block';
                 startGame(); // A játék elindítása
             });
         }
 
         function startGame() {
-            generateMaze();
+            generateObstacles();
             document.addEventListener('keydown', handleKeyPress);
         }
 
-        function generateMaze() {
-            gameContainer.style.position = 'relative';
-            gameContainer.style.left = `calc(50% - 100px)`;
-            gameContainer.style.top = `calc(50% - 100px)`;
-
-            for (let i = 0; i < 10; i++) {
-                for (let j = 0; j < 10; j++) {
-                    if (Math.random() < 0.2) {
-                        const wall = document.createElement('div');
-                        wall.classList.add('wall');
-                        wall.style.width = '20px';
-                        wall.style.height = '20px';
-                        wall.style.left = `${j * 20}px`;
-                        wall.style.top = `${i * 20}px`;
-                        gameContainer.appendChild(wall);
-                        walls.push({ x: j * 20, y: i * 20 });
-                    }
-                }
-            }
-
-            const exit = document.createElement('div');
-            exit.classList.add('wall');
-            exit.style.width = '20px';
-            exit.style.height = '20px';
-            exit.style.left = `180px`;
-            exit.style.top = `180px`;
-            gameContainer.appendChild(exit);
-            walls.push({ x: 180, y: 180 });
+        function generateObstacles() {
+            setInterval(() => {
+                const obstacle = document.createElement('div');
+                obstacle.classList.add('obstacle');
+                obstacle.style.width = `${Math.random() * 40 + 20}px`;
+                obstacle.style.height = '20px';
+                obstacle.style.bottom = '20px';
+                obstacle.style.left = '800px'; // Kezdeti pozíció
+                gameContainer.appendChild(obstacle);
+            }, 3000); // 3 másodpercenként új akadály
         }
 
-        function createPlayer(x, y, color) {
+        function createPlayer(username) {
             const playerDiv = document.createElement('div');
             playerDiv.classList.add('player');
-            playerDiv.style.backgroundColor = color;
-            playerDiv.style.left = `${x}px`;
-            playerDiv.style.top = `${y}px`;
+            playerDiv.id = username; // A játékos nevét használjuk az azonosításhoz
+            playerDiv.style.left = '50px';
             gameContainer.appendChild(playerDiv);
         }
 
         function handleKeyPress(event) {
-            const player = players[Object.keys(players)[0]];
+            const player = players[Object.keys(players)[0]]; // Az első játékos adatai
             switch (event.key) {
                 case 'ArrowUp':
-                    movePlayer(player, 0, -20);
+                    jumpPlayer(player);
                     break;
                 case 'ArrowDown':
-                    movePlayer(player, 0, 20);
-                    break;
-                case 'ArrowLeft':
-                    movePlayer(player, -20, 0);
-                    break;
-                case 'ArrowRight':
-                    movePlayer(player, 20, 0);
+                    crouchPlayer(player);
                     break;
             }
         }
 
-        function movePlayer(player, dx, dy) {
-            const newX = player.position.x + dx;
-            const newY = player.position.y + dy;
-            if (!checkCollision(newX, newY)) {
-                player.position.x = newX;
-                player.position.y = newY;
-                db.ref(`games/${currentGameId}/players/${Object.keys(players)[0]}`).update({ position: player.position });
-                updatePlayerPositionInDOM(player);
+        function jumpPlayer(player) {
+            const playerDiv = document.getElementById(Object.keys(players)[0]); // Az első játékos div-je
+            playerDiv.style.bottom = '60px'; // Ugrás magassága
+            setTimeout(() => {
+                playerDiv.style.bottom = '20px'; // Visszatérés a földre
+            }, 500);
+        }
+
+        function crouchPlayer(player) {
+            const playerDiv = document.getElementById(Object.keys(players)[0]); // Az első játékos div-je
+            playerDiv.style.height = '10px'; // Guggolás magassága
+            setTimeout(() => {
+                playerDiv.style.height = '20px'; // Visszaállás eredeti magasságra
+            }, 500);
+        }
+
+        // Ütközések ellenőrzése
+        function checkCollisions() {
+            const obstacles = document.getElementsByClassName('obstacle');
+            const playerDiv = document.getElementById(Object.keys(players)[0]);
+            const playerRect = playerDiv.getBoundingClientRect();
+
+            for (let obstacle of obstacles) {
+                const obstacleRect = obstacle.getBoundingClientRect();
+                if (
+                    playerRect.x < obstacleRect.x + obstacleRect.width &&
+                    playerRect.x + playerRect.width > obstacleRect.x &&
+                    playerRect.y < obstacleRect.y + obstacleRect.height &&
+                    playerRect.y + playerRect.height > obstacleRect.y
+                ) {
+                    alert('Ütközés! A játék véget ért.');
+                    resetGame();
+                    break;
+                }
             }
         }
 
-        function checkCollision(x, y) {
-            return walls.some(wall => wall.x === x && wall.y === y);
+        function resetGame() {
+            document.location.reload(); // Újraindítja a játékot
         }
 
-        function updatePlayerPositionInDOM(player) {
-            const playerDiv = document.querySelector(`.player[style*="background-color: ${player.color};"]`);
-            if (playerDiv) {
-                playerDiv.style.left = `${player.position.x}px`;
-                playerDiv.style.top = `${player.position.y}px`;
-            }
-        }
-
+        // Ütközések ellenőrzése folyamatosan
+        setInterval(checkCollisions, 100); // 100ms-enként ellenőrzi az ütközéseket
         function generateGameId() {
-            return Math.random().toString(36).substring(2, 8);
-        }
-
-        function getRandomColor() {
-            const letters = '0123456789ABCDEF';
-            let color = '#';
-            for (let i = 0; i < 6; i++) {
-                color += letters[Math.floor(Math.random() * 16)];
-            }
-            return color;
+            return Math.random().toString(36).substr(2, 5); // Generál egy 5 karakteres játék kódot
         }
     </script>
 </body>
