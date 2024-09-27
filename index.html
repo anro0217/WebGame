@@ -237,31 +237,40 @@
             gameContainer.appendChild(playerDiv);
         }
 
-        function handleKeyPress(e) {
-            const direction = { x: 0, y: 0 };
-            if (e.key === 'ArrowUp') direction.y = -20;
-            if (e.key === 'ArrowDown') direction.y = 20;
-            if (e.key === 'ArrowLeft') direction.x = -20;
-            if (e.key === 'ArrowRight') direction.x = 20;
-
-            const newPosition = { x: players[Object.keys(players)[0]].position.x + direction.x, y: players[Object.keys(players)[0]].position.y + direction.y };
-            if (canMove(newPosition)) {
-                players[Object.keys(players)[0]].position = newPosition;
-                db.ref(`games/${currentGameId}/players/${Object.keys(players)[0]}/position`).set(newPosition);
+        function handleKeyPress(event) {
+            if (event.key === 'ArrowUp') {
+                movePlayer(0, -20);
+            } else if (event.key === 'ArrowDown') {
+                movePlayer(0, 20);
+            } else if (event.key === 'ArrowLeft') {
+                movePlayer(-20, 0);
+            } else if (event.key === 'ArrowRight') {
+                movePlayer(20, 0);
             }
         }
 
-        function canMove(newPosition) {
-            for (const wall of walls) {
-                if (newPosition.x === wall.x && newPosition.y === wall.y) {
-                    return false; // Ütközés
+        function movePlayer(dx, dy) {
+            const playerData = players[document.getElementById('username').value];
+            if (playerData) {
+                const newX = playerData.position.x + dx;
+                const newY = playerData.position.y + dy;
+
+                if (!isCollision(newX, newY)) {
+                    playerData.position.x = newX;
+                    playerData.position.y = newY;
+                    db.ref(`games/${currentGameId}/players/${document.getElementById('username').value}`).update({
+                        position: playerData.position
+                    });
                 }
             }
-            return true; // Szabad mozgás
+        }
+
+        function isCollision(x, y) {
+            return walls.some(wall => wall.x === x && wall.y === y);
         }
 
         function generateGameId() {
-            return Math.random().toString(36).substring(2, 8);
+            return Math.random().toString(36).substr(2, 5);
         }
 
         function getRandomColor() {
