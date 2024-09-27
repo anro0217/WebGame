@@ -91,13 +91,14 @@
         document.getElementById('startGame').addEventListener('click', startGameFromLobby);
 
         function createNewGame() {
-            currentGameId = generateGameId();
-            db.ref(`games/${currentGameId}`).set({ players: {}, started: false });
-            const username = document.getElementById('username').value;
-            document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
-            enterLobby();
-            addPlayerToLobby(username);
-        }
+    const username = document.getElementById('username').value;
+    currentGameId = generateGameId();
+    db.ref(`games/${currentGameId}`).set({ players: {}, started: false, creator: username });
+    document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
+    enterLobby();
+    addPlayerToLobby(username);
+}
+
 
         function joinGame() {
             const code = document.getElementById('joinCode').value;
@@ -115,10 +116,23 @@
         }
 
         function enterLobby() {
-            document.getElementById('controls').style.display = 'none';
-            lobby.style.display = 'block';
-            listenForPlayers();
+    document.getElementById('controls').style.display = 'none';
+    lobby.style.display = 'block';
+
+    const username = document.getElementById('username').value;
+
+    db.ref(`games/${currentGameId}/creator`).once('value').then(snapshot => {
+        const creator = snapshot.val();
+        if (username === creator) {
+            document.getElementById('startGame').style.display = 'block'; // Csak a lobby létrehozójának jelenjen meg
+        } else {
+            document.getElementById('startGame').style.display = 'none'; // Többiek számára rejtve
         }
+    });
+
+    listenForPlayers();
+}
+
 
         function addPlayerToLobby(username) {
             const color = getRandomColor();
@@ -138,11 +152,8 @@
             });
         }
 
-        // A játék indítására szolgáló függvény
-function startGameFromLobby() {
-    // Ellenőrizzük, hogy van-e játék az adatbázisban
+        function startGameFromLobby() {
     if (currentGameId) {
-        // Frissítjük a 'started' mezőt a Firebase-ben
         db.ref(`games/${currentGameId}`).update({ started: true })
             .then(() => {
                 console.log('A játék elindult.');
@@ -150,8 +161,20 @@ function startGameFromLobby() {
             .catch((error) => {
                 console.error('Hiba a játék indításakor:', error);
             });
+
+        // Figyeljük a játék elindulását
+        db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
+            const gameData = snapshot.val();
+            if (gameData && gameData.started) {
+                console.log('A játék elkezdődött');
+                lobby.style.display = 'none';  // Elrejtjük a lobbit
+                gameContainer.style.display = 'block';  // Megjelenítjük a játékfelületet
+                startGame();  // Elindítjuk a játékot
+            }
+        });
     }
 }
+
 
 // Játék indításának figyelése a Firebase adatbázisban
 db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
