@@ -10,12 +10,15 @@
             background-color: #1d1f21;
             font-family: Arial, sans-serif;
             color: white;
+            position: relative;
+            z-index: 0; /* Z-index beállítás a kattinthatóság érdekében */
         }
         #gameContainer {
             position: relative;
             width: 100%;
             height: 100vh;
             overflow: hidden;
+            z-index: 1; /* A játékterület z-index beállítása */
         }
         .player {
             position: absolute;
@@ -31,6 +34,7 @@
             position: absolute;
             top: 10px;
             left: 10px;
+            z-index: 2; /* A vezérlők z-index beállítása */
         }
     </style>
 </head>
