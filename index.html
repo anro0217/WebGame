@@ -23,16 +23,22 @@
             position: absolute;
             color: white;
             font-size: 18px;
-        }
-
-        #player1 {
             top: 10px;
             left: 10px;
+            display: flex;
+            flex-direction: column;
         }
 
-        #player2 {
-            top: 10px;
-            right: 10px;
+        .player-entry {
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+
+        .color-box {
+            width: 15px;
+            height: 15px;
+            margin-right: 10px;
         }
 
         .territory {
@@ -44,112 +50,129 @@
 </head>
 <body>
     <div id="container"></div>
-    <div id="player1" class="player-info">Player 1: <span id="score1">0</span></div>
-    <div id="player2" class="player-info">Player 2: <span id="score2">0</span></div>
+    <div id="playerList" class="player-info"></div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    <script>
-        // Firebase konfiguráció (használj saját Firebase adataidat)
-        const firebaseConfig = {
-            apiKey: "API_KEY",
-            authDomain: "webgame-9d262.firebaseapp.com",
-            databaseURL: "https://webgame-9d262-default-rtdb.firebaseio.com",
-            projectId: "webgame-9d262",
-            storageBucket: "webgame-9d262.appspot.com",
-            messagingSenderId: "58124462561",
-            appId: "1:58124462561:web:13e73b14bf30f0943dcaa0",
-            measurementId: "G-DVN12051Y0"
-        };
+    <script type="module">
+        import firebaseConfig from './firebaseConfig.js';
 
         // Firebase inicializálása
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+    </script>
 
+    <script>
         let playerId = null;
-        let score1 = 0;
-        let score2 = 0;
+        const playerColors = {};
+        const territories = {};
+        let playerListDiv = document.getElementById('playerList');
+        const colors = ['rgba(0, 255, 0, 0.5)', 'rgba(255, 0, 0, 0.5)', 'rgba(0, 0, 255, 0.5)', 'rgba(255, 255, 0, 0.5)'];
+        let usedColors = {};
+        let lastClickTime = 0;
 
         // Felhasználói azonosítás
         const username = prompt("Add meg a felhasználóneved:");
+        const userRef = db.ref(`players/${username}`);
 
-        db.ref('players').once('value').then(snapshot => {
-            const players = snapshot.val();
-            if (!players || !players[username]) {
-                playerId = Object.keys(players || {}).length + 1;
-                db.ref(`players/${username}`).set({ score: 0, playerId });
-                alert(`Te vagy a ${playerId}. játékos`);
+        userRef.once('value').then(snapshot => {
+            const playerData = snapshot.val();
+            if (!playerData) {
+                playerId = Date.now();
+                const color = getUnusedColor();
+                playerColors[username] = color;
+                userRef.set({ playerId, score: 0, color, lastActive: Date.now() });
+                userRef.onDisconnect().remove(); // Automatikus eltávolítás
             } else {
-                playerId = players[username].playerId;
-                alert(`Üdv újra, ${username}!`);
+                playerId = playerData.playerId;
+                playerColors[username] = playerData.color;
+                userRef.update({ lastActive: Date.now() });
             }
+            alert(`Üdv, ${username}!`);
         });
 
-        // Pontok frissítése
+        // Más játékosok aktivitásának figyelése
         db.ref('players').on('value', (snapshot) => {
             const players = snapshot.val();
-            if (players) {
-                score1 = players.player1?.score || 0;
-                score2 = players.player2?.score || 0;
-                document.getElementById('score1').innerText = score1;
-                document.getElementById('score2').innerText = score2;
+            playerListDiv.innerHTML = '';
+            for (const [name, data] of Object.entries(players)) {
+                if (Date.now() - data.lastActive > 60000) {
+                    db.ref(`players/${name}`).remove();
+                    removePlayerTerritory(data.playerId);
+                } else {
+                    playerListDiv.innerHTML += createPlayerEntry(name, data.color);
+                    usedColors[name] = data.color;
+                }
             }
         });
 
+        // Területfoglalás
         const container = document.getElementById('container');
-
-        // Terület foglalása kattintással
         container.addEventListener('click', (e) => {
-            if (!playerId) return;
-
+            const now = Date.now();
+            if (!playerId || now - lastClickTime < 1000) return; // Limitálás másodpercenként
+            lastClickTime = now;
             const x = e.clientX;
             const y = e.clientY;
+            createTerritory(x, y, playerColors[username]);
 
-            // Terület létrehozása
-            const territory = document.createElement('div');
-            territory.classList.add('territory');
-            territory.style.width = '50px';
-            territory.style.height = '50px';
-            territory.style.left = `${x - 25}px`;
-            territory.style.top = `${y - 25}px`;
-            territory.style.backgroundColor = playerId === 1 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
-            container.appendChild(territory);
-
-            // Frissítjük a Firebase adatbázist
             db.ref('clicks').push({
                 x: x,
                 y: y,
                 player: playerId,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                color: playerColors[username]
             });
 
-            // Frissítjük a játékos pontszámát
-            if (playerId === 1) {
-                score1 += 1;
-                db.ref(`players/player1/score`).set(score1);
-            } else {
-                score2 += 1;
-                db.ref(`players/player2/score`).set(score2);
-            }
+            userRef.update({ lastActive: Date.now() });
         });
 
-        // Másik játékos területfoglalásának megjelenítése
+        // Területek megjelenítése más játékosok számára
         db.ref('clicks').on('child_added', (snapshot) => {
             const clickData = snapshot.val();
-            createTerritory(clickData.x, clickData.y, clickData.player);
+            if (!territories[clickData.player]) {
+                territories[clickData.player] = [];
+            }
+            const territory = createTerritory(clickData.x, clickData.y, clickData.color);
+            territories[clickData.player].push(territory);
         });
 
-        function createTerritory(x, y, player) {
+        // Terület létrehozása
+        function createTerritory(x, y, color) {
             const territory = document.createElement('div');
             territory.classList.add('territory');
             territory.style.width = '50px';
             territory.style.height = '50px';
             territory.style.left = `${x - 25}px`;
             territory.style.top = `${y - 25}px`;
-            territory.style.backgroundColor = player === 1 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
+            territory.style.backgroundColor = color;
             container.appendChild(territory);
+            return territory;
+        }
+
+        // Játékos belépésekor listához adás
+        function createPlayerEntry(name, color) {
+            return `<div class="player-entry"><div class="color-box" style="background-color:${color};"></div>${name}</div>`;
+        }
+
+        // Játékos területeinek eltávolítása
+        function removePlayerTerritory(playerId) {
+            if (territories[playerId]) {
+                territories[playerId].forEach(t => t.remove());
+                delete territories[playerId];
+            }
+        }
+
+        // Szín kiosztása játékosnak
+        function getUnusedColor() {
+            for (const color of colors) {
+                if (!Object.values(usedColors).includes(color)) {
+                    return color;
+                }
+            }
+            return 'rgba(255, 255, 255, 0.5)';
         }
     </script>
 </body>
