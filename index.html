@@ -179,14 +179,19 @@
         }
 
         function redirectAllPlayersToGame() {
-            db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
-                snapshot.forEach(playerSnapshot => {
-                    const username = playerSnapshot.key;
-                    db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true });
+    db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
+        snapshot.forEach(playerSnapshot => {
+            const username = playerSnapshot.key;
+            db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true })
+                .then(() => {
+                    // Itt is elrejtheted a lobby nézetet minden játékosnál
+                    lobby.style.display = 'none';
+                    gameContainer.style.display = 'block'; // A játék megnyitása
                 });
-            });
-            listenForGameStart();
-        }
+        });
+    });
+    listenForGameStart();
+}
 
         function listenForGameStart() {
             db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
@@ -199,18 +204,18 @@
         }
 
         function loadAllPlayers() {
-            db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
-                snapshot.forEach(playerSnapshot => {
-                    const playerData = playerSnapshot.val();
-                    if (playerData.inGame) {
-                        createPlayer(playerSnapshot.key);
-                    }
-                });
-                lobby.style.display = 'none';
-                gameContainer.style.display = 'block';
-                startGame(); // A játék elindítása
-            });
-        }
+    db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
+        snapshot.forEach(playerSnapshot => {
+            const playerData = playerSnapshot.val();
+            if (playerData.inGame) {
+                createPlayer(playerSnapshot.key);
+            }
+        });
+        gameContainer.style.display = 'block'; // A játék megnyitása
+        startGame(); // A játék elindítása
+    });
+}
+
 
         function startGame() {
             generateObstacles();
