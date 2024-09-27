@@ -3,20 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Játék</title>
+    <title>Lobby</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Üdvözöljük a Web Játékban!</h1>
-        <input type="text" id="username" placeholder="Felhasználónév" required>
-        <input type="text" id="gameCode" placeholder="Csatlakozási kód" required>
-        <button id="joinGame">Csatlakozás meglévő játékhoz</button>
-        <button id="createGame">Új játék létrehozása</button>
+        <h1>Lobby</h1>
+        <div id="playersList"></div>
+        <button id="startGame">Játék indítása</button>
     </div>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
     <script src="firebaseConfig.js"></script>
-    <script src="script.js"></script>
+    <script src="lobbyScript.js"></script>
 </body>
 </html>
