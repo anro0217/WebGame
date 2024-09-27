@@ -138,17 +138,32 @@
             });
         }
 
-        function startGameFromLobby() {
-            db.ref(`games/${currentGameId}`).update({ started: true });
-        }
+        // A játék indítására szolgáló függvény
+function startGameFromLobby() {
+    // Ellenőrizzük, hogy van-e játék az adatbázisban
+    if (currentGameId) {
+        // Frissítjük a 'started' mezőt a Firebase-ben
+        db.ref(`games/${currentGameId}`).update({ started: true })
+            .then(() => {
+                console.log('A játék elindult.');
+            })
+            .catch((error) => {
+                console.error('Hiba a játék indításakor:', error);
+            });
+    }
+}
 
-        db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
-            if (snapshot.val().started) {
-                lobby.style.display = 'none';
-                gameContainer.style.display = 'block';
-                startGame();
-            }
-        });
+// Játék indításának figyelése a Firebase adatbázisban
+db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
+    const gameData = snapshot.val();
+    if (gameData && gameData.started) {
+        console.log('A játék elkezdődött');
+        lobby.style.display = 'none';  // Elrejtjük a lobbit
+        gameContainer.style.display = 'block';  // Megjelenítjük a játékfelületet
+        startGame();  // Elindítjuk a játékot
+    }
+});
+
 
         function startGame() {
             generateMaze();
