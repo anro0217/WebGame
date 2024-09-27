@@ -1,7 +1,5 @@
-import firebaseConfig from './firebaseConfig.js';
-
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+import { db } from './firebaseConfig.js';
+import { ref, onValue, update } from 'firebase/database';
 
 const params = new URLSearchParams(window.location.search);
 const gameId = params.get('gameId');
@@ -10,9 +8,8 @@ const playerColor = params.get('color');
 
 const playersList = document.getElementById('playersList');
 
-async function updatePlayersList() {
-    const gameDoc = await db.collection('games').doc(gameId).get();
-    const players = gameDoc.data().players;
+function updatePlayersList(snapshot) {
+    const players = snapshot.val().players;
 
     playersList.innerHTML = '';
     for (const [name, color] of Object.entries(players)) {
@@ -23,11 +20,14 @@ async function updatePlayersList() {
     }
 }
 
+// Real-time listener for players
+onValue(ref(db, `games/${gameId}`), (snapshot) => {
+    updatePlayersList(snapshot);
+});
+
 document.getElementById('startGame').onclick = async function() {
-    await db.collection('games').doc(gameId).update({
+    await update(ref(db, `games/${gameId}`), {
         started: true
     });
     window.location.href = `game.html?gameId=${gameId}`;
 };
-
-db.collection('games').doc(gameId).onSnapshot(updatePlayersList);
