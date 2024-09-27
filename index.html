@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Kattintós Játék</title>
+    <title>Multiplayer Területfoglalós Játék</title>
     <style>
         body {
             margin: 0;
@@ -17,49 +17,9 @@
             width: 100%;
             height: 100vh;
             overflow: hidden;
-            perspective: 1000px;
         }
 
-        .text {
-            position: absolute;
-            font-size: 24px;
-            color: #fff;
-            opacity: 1;
-            display: inline-block;
-            transform-style: preserve-3d;
-        }
-
-        @keyframes explode {
-            0% {
-                transform: scale(1) rotateX(0) rotateY(0) rotateZ(0);
-                opacity: 1;
-            }
-            100% {
-                transform: scale(2) translateY(100vh) rotateX(720deg) rotateY(720deg) rotateZ(360deg);
-                opacity: 0;
-            }
-        }
-
-        .particle {
-            position: absolute;
-            width: 5px;
-            height: 5px;
-            background-color: rgba(255, 255, 255, 0.7);
-            border-radius: 50%;
-            animation: particle-move 1s ease-out forwards;
-        }
-
-        @keyframes particle-move {
-            0% {
-                opacity: 1;
-            }
-            100% {
-                transform: translate(var(--x), var(--y));
-                opacity: 0;
-            }
-        }
-
-        #player1, #player2 {
+        .player-info {
             position: absolute;
             color: white;
             font-size: 18px;
@@ -74,21 +34,27 @@
             top: 10px;
             right: 10px;
         }
+
+        .territory {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+        }
     </style>
 </head>
 <body>
     <div id="container"></div>
-    <div id="player1">Player 1: <span id="score1">0</span></div>
-    <div id="player2">Player 2: <span id="score2">0</span></div>
+    <div id="player1" class="player-info">Player 1: <span id="score1">0</span></div>
+    <div id="player2" class="player-info">Player 2: <span id="score2">0</span></div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script>
-        // Firebase konfiguráció (Ezt a Firebase-ből másolhatod)
+        // Firebase konfiguráció (használj saját Firebase adataidat)
         const firebaseConfig = {
-            apiKey: "AIzaSyAwjOVHoM1zFB26KCXKQRHHQyt5bWmqfEM",
+            apiKey: "API_KEY",
             authDomain: "webgame-9d262.firebaseapp.com",
             databaseURL: "https://webgame-9d262-default-rtdb.firebaseio.com",
             projectId: "webgame-9d262",
@@ -97,29 +63,31 @@
             appId: "1:58124462561:web:13e73b14bf30f0943dcaa0",
             measurementId: "G-DVN12051Y0"
         };
-        
+
         // Firebase inicializálása
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const container = document.getElementById('container');
         let playerId = null;
         let score1 = 0;
         let score2 = 0;
 
-        // Kezdeti játékosok száma
+        // Felhasználói azonosítás
+        const username = prompt("Add meg a felhasználóneved:");
+
         db.ref('players').once('value').then(snapshot => {
             const players = snapshot.val();
-            if (!players || Object.keys(players).length < 2) {
+            if (!players || !players[username]) {
                 playerId = Object.keys(players || {}).length + 1;
-                db.ref(`players/player${playerId}`).set({ score: 0 });
+                db.ref(`players/${username}`).set({ score: 0, playerId });
                 alert(`Te vagy a ${playerId}. játékos`);
             } else {
-                alert("A játék már folyamatban van, csatlakozz később!");
+                playerId = players[username].playerId;
+                alert(`Üdv újra, ${username}!`);
             }
         });
 
-        // Pontok frissítése valós időben
+        // Pontok frissítése
         db.ref('players').on('value', (snapshot) => {
             const players = snapshot.val();
             if (players) {
@@ -130,70 +98,58 @@
             }
         });
 
-        // Kattintás események figyelése
+        const container = document.getElementById('container');
+
+        // Terület foglalása kattintással
         container.addEventListener('click', (e) => {
             if (!playerId) return;
 
             const x = e.clientX;
             const y = e.clientY;
 
-            // Küldjük el az adatokat a Firebase-nek
+            // Terület létrehozása
+            const territory = document.createElement('div');
+            territory.classList.add('territory');
+            territory.style.width = '50px';
+            territory.style.height = '50px';
+            territory.style.left = `${x - 25}px`;
+            territory.style.top = `${y - 25}px`;
+            territory.style.backgroundColor = playerId === 1 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
+            container.appendChild(territory);
+
+            // Frissítjük a Firebase adatbázist
             db.ref('clicks').push({
                 x: x,
                 y: y,
-                player: playerId
+                player: playerId,
+                timestamp: Date.now()
             });
 
-            // Frissítsük a játékos pontszámát
+            // Frissítjük a játékos pontszámát
             if (playerId === 1) {
                 score1 += 1;
                 db.ref(`players/player1/score`).set(score1);
-            } else if (playerId === 2) {
+            } else {
                 score2 += 1;
                 db.ref(`players/player2/score`).set(score2);
             }
         });
 
-        // Robbanás effekt létrehozása a Firebase-ből kapott adatok alapján
+        // Másik játékos területfoglalásának megjelenítése
         db.ref('clicks').on('child_added', (snapshot) => {
             const clickData = snapshot.val();
-            createExplosion(clickData.x, clickData.y);
+            createTerritory(clickData.x, clickData.y, clickData.player);
         });
 
-        function createExplosion(x, y) {
-            const text = document.createElement('div');
-            text.classList.add('text');
-            text.style.left = `${x}px`;
-            text.style.top = `${y}px`;
-            text.style.animation = `explode 1s ease-in-out forwards`;
-            container.appendChild(text);
-
-            // Részecskék robbanáshoz
-            createParticles(text, x, y);
-
-            // Eltávolítás animáció után
-            setTimeout(() => {
-                text.remove();
-            }, 1000);
-        }
-
-        // Részecske effektek
-        function createParticles(element, x, y) {
-            for (let i = 0; i < 50; i++) {
-                const particle = document.createElement('div');
-                particle.classList.add('particle');
-                particle.style.left = `${x}px`;
-                particle.style.top = `${y}px`;
-                particle.style.setProperty('--x', `${Math.random() * 300 - 150}px`);
-                particle.style.setProperty('--y', `${Math.random() * 300 - 150}px`);
-
-                container.appendChild(particle);
-
-                // Törlés az animáció után
-                setTimeout(() => {
-                    particle.remove();
-                }, 1000);
-            }
+        function createTerritory(x, y, player) {
+            const territory = document.createElement('div');
+            territory.classList.add('territory');
+            territory.style.width = '50px';
+            territory.style.height = '50px';
+            territory.style.left = `${x - 25}px`;
+            territory.style.top = `${y - 25}px`;
+            territory.style.backgroundColor = player === 1 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
+            container.appendChild(territory);
         }
     </script>
 </body>
