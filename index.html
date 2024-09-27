@@ -155,29 +155,43 @@
         }
 
         function startGameFromLobby() {
-            if (currentGameId) {
-                db.ref(`games/${currentGameId}`).update({ started: true })
-                    .then(() => {
-                        console.log('A játék elindult.');
-                        listenForGameStart();
-                    })
-                    .catch((error) => {
-                        console.error('Hiba a játék indításakor:', error);
-                    });
-            }
-        }
+  if (currentGameId) {
+    db.ref(`games/${currentGameId}`).update({ started: true })
+      .then(() => {
+        console.log('A játék elindult.');
+        // Update all players in the lobby
+        db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
+          snapshot.forEach(playerSnapshot => {
+            const username = playerSnapshot.key;
+            // Set the player's 'inGame' state to true
+            db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true });
+          });
+        });
+      })
+      .catch((error) => {
+        console.error('Hiba a játék indításakor:', error);
+      });
+  }
+}
 
-        function listenForGameStart() {
-            db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
-                const gameData = snapshot.val();
-                if (gameData && gameData.started) {
-                    console.log('A játék elkezdődött');
-                    lobby.style.display = 'none'; // Elrejtjük a lobbit
-                    gameContainer.style.display = 'block'; // Megjelenítjük a játékfelületet
-                    startGame(); // Elindítjuk a játékot
-                }
-            });
+function listenForGameStart() {
+  db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
+    const gameData = snapshot.val();
+    if (gameData && gameData.started) {
+      console.log('A játék elkezdődött');
+      const username = document.getElementById('username').value;
+      // Check if player is marked as 'inGame'
+      db.ref(`games/${currentGameId}/players/${username}`).once('value').then((snapshot) => {
+        const playerData = snapshot.val();
+        if (playerData && playerData.inGame) {
+          lobby.style.display = 'none'; // Elrejtjük a lobbit
+          gameContainer.style.display = 'block'; // Megjelenítjük a játékfelületet
+          startGame(); // Elindítjuk a játékot
         }
+      });
+    }
+  });
+}
 
         function startGame() {
             generateMaze(); // Generáljuk a labirintust itt
