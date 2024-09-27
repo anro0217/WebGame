@@ -62,9 +62,7 @@
         // Firebase inicializálása
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-    </script>
 
-    <script>
         let playerId = null;
         const playerColors = {};
         const territories = {};
@@ -83,7 +81,9 @@
                 playerId = Date.now();
                 const color = getUnusedColor();
                 playerColors[username] = color;
-                userRef.set({ playerId, score: 0, color, lastActive: Date.now() });
+                userRef.set({ playerId, score: 0, color, lastActive: Date.now() })
+                    .then(() => console.log('Játékos sikeresen hozzáadva!'))
+                    .catch((error) => console.error('Hiba a játékos hozzáadásakor:', error));
                 userRef.onDisconnect().remove(); // Automatikus eltávolítás
             } else {
                 playerId = playerData.playerId;
@@ -91,7 +91,7 @@
                 userRef.update({ lastActive: Date.now() });
             }
             alert(`Üdv, ${username}!`);
-        });
+        }).catch((error) => console.error('Hiba a játékos lekérdezésekor:', error));
 
         // Más játékosok aktivitásának figyelése
         db.ref('players').on('value', (snapshot) => {
@@ -132,10 +132,10 @@
         // Területek megjelenítése más játékosok számára
         db.ref('clicks').on('child_added', (snapshot) => {
             const clickData = snapshot.val();
+            const territory = createTerritory(clickData.x, clickData.y, clickData.color);
             if (!territories[clickData.player]) {
                 territories[clickData.player] = [];
             }
-            const territory = createTerritory(clickData.x, clickData.y, clickData.color);
             territories[clickData.player].push(territory);
         });
 
