@@ -69,7 +69,6 @@
         let playerListDiv = document.getElementById('playerList');
         const colors = ['rgba(0, 255, 0, 0.5)', 'rgba(255, 0, 0, 0.5)', 'rgba(0, 0, 255, 0.5)', 'rgba(255, 255, 0, 0.5)'];
         let usedColors = {};
-        let lastClickTime = 0;
 
         // Felhasználói azonosítás
         const username = prompt("Add meg a felhasználóneved:");
@@ -84,7 +83,7 @@
                 userRef.set({ playerId, score: 0, color, lastActive: Date.now() })
                     .then(() => console.log('Játékos sikeresen hozzáadva!'))
                     .catch((error) => console.error('Hiba a játékos hozzáadásakor:', error));
-                userRef.onDisconnect().remove(); // Automatikus eltávolítás
+                userRef.onDisconnect().remove(); // Automatikus eltávolítás bezáráskor
             } else {
                 playerId = playerData.playerId;
                 playerColors[username] = playerData.color;
@@ -98,6 +97,7 @@
             const players = snapshot.val();
             playerListDiv.innerHTML = '';
             for (const [name, data] of Object.entries(players)) {
+                // Csak akkor töröljük a játékost, ha 1 percig inaktív
                 if (Date.now() - data.lastActive > 60000) {
                     db.ref(`players/${name}`).remove();
                     removePlayerTerritory(data.playerId);
@@ -111,9 +111,6 @@
         // Területfoglalás
         const container = document.getElementById('container');
         container.addEventListener('click', (e) => {
-            const now = Date.now();
-            if (!playerId || now - lastClickTime < 1000) return; // Limitálás másodpercenként
-            lastClickTime = now;
             const x = e.clientX;
             const y = e.clientY;
             createTerritory(x, y, playerColors[username]);
