@@ -65,7 +65,7 @@
         <h2>Lobby</h2>
         <p id="lobbyPlayers">Várakozás a játékosokra...</p>
         <p id="gameCode"></p>
-        <button id="startGame">Játék Indítása</button>
+        <button id="startGame" style="display: none;">Játék Indítása</button>
     </div>
     <div id="playerList"></div>
     <div id="gameContainer"></div>
@@ -156,20 +156,7 @@
                 db.ref(`games/${currentGameId}`).update({ started: true })
                     .then(() => {
                         console.log('A játék elindult.');
-                        // Set all players' 'inGame' state to true and redirect them
-                        db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
-                            snapshot.forEach(playerSnapshot => {
-                                const username = playerSnapshot.key;
-                                db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true })
-                                    .then(() => {
-                                        if (username !== playerId) { // Ha nem a host
-                                            // Redirect other players to the game view
-                                            redirectToGameView(username);
-                                        }
-                                    });
-                            });
-                        });
-                        listenForGameStart();
+                        redirectAllPlayersToGame();
                     })
                     .catch((error) => {
                         console.error('Hiba a játék indításakor:', error);
@@ -177,12 +164,15 @@
             }
         }
 
-        function redirectToGameView(username) {
-            // Itt tudod kezelni, hogy hogyan irányítsd át a játékosokat
-            loadAllPlayers(); // Ez a funkció betölti a játékosokat és a játék felületét
-            lobby.style.display = 'none'; 
-            gameContainer.style.display = 'block'; 
-            startGame(); // A játék elindítása
+        function redirectAllPlayersToGame() {
+            db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
+                snapshot.forEach(playerSnapshot => {
+                    const username = playerSnapshot.key;
+                    db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true });
+                    loadAllPlayers(username); // Minden játékos átirányítása a játék felületére
+                });
+            });
+            listenForGameStart();
         }
 
         function listenForGameStart() {
@@ -195,21 +185,22 @@
             });
         }
 
-        function loadAllPlayers() {
+        function loadAllPlayers(username) {
             db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
                 snapshot.forEach(playerSnapshot => {
                     const playerData = playerSnapshot.val();
-                    if (playerData.inGame) { // Csak azokat a játékosokat töltjük be, akik a játékban vannak
+                    if (playerData.inGame) {
                         createPlayer(playerData.position.x, playerData.position.y, playerData.color);
                     }
                 });
+                lobby.style.display = 'none'; 
+                gameContainer.style.display = 'block'; 
                 startGame(); // A játék elindítása
             });
         }
 
         function startGame() {
             generateMaze();
-            loadPlayers();
             document.addEventListener('keydown', handleKeyPress);
         }
 
@@ -227,46 +218,20 @@
                         wall.style.height = '20px';
                         wall.style.left = `${j * 20}px`;
                         wall.style.top = `${i * 20}px`;
-                        walls.push({ x: j * 20, y: i * 20 });
                         gameContainer.appendChild(wall);
+                        walls.push({ x: j * 20, y: i * 20 });
                     }
                 }
             }
-        }
 
-        function handleKeyPress(event) {
-            const player = players[username];
-            let newPosition = { x: player.position.x, y: player.position.y };
-
-            switch (event.key) {
-                case 'ArrowUp':
-                    newPosition.y -= 20;
-                    break;
-                case 'ArrowDown':
-                    newPosition.y += 20;
-                    break;
-                case 'ArrowLeft':
-                    newPosition.x -= 20;
-                    break;
-                case 'ArrowRight':
-                    newPosition.x += 20;
-                    break;
-            }
-
-            if (!isColliding(newPosition)) {
-                player.position = newPosition;
-                updatePlayerPosition(username, player.position);
-            }
-        }
-
-        function isColliding(position) {
-            // Ellenőrizzük, hogy a játéknak van-e ütközése a falakkal
-            for (const wall of walls) {
-                if (position.x === wall.x && position.y === wall.y) {
-                    return true; // Ütközés van
-                }
-            }
-            return false; // Nincs ütközés
+            const exit = document.createElement('div');
+            exit.classList.add('wall');
+            exit.style.width = '20px';
+            exit.style.height = '20px';
+            exit.style.left = `180px`;
+            exit.style.top = `180px`;
+            gameContainer.appendChild(exit);
+            walls.push({ x: 180, y: 180 });
         }
 
         function createPlayer(x, y, color) {
@@ -278,17 +243,49 @@
             gameContainer.appendChild(playerDiv);
         }
 
-        function updatePlayerPosition(username, position) {
-            db.ref(`games/${currentGameId}/players/${username}`).update({ position });
-            loadPlayers(); // Frissítjük a játékosokat a felületen
+        function handleKeyPress(event) {
+            const player = players[Object.keys(players)[0]];
+            switch (event.key) {
+                case 'ArrowUp':
+                    movePlayer(player, 0, -20);
+                    break;
+                case 'ArrowDown':
+                    movePlayer(player, 0, 20);
+                    break;
+                case 'ArrowLeft':
+                    movePlayer(player, -20, 0);
+                    break;
+                case 'ArrowRight':
+                    movePlayer(player, 20, 0);
+                    break;
+            }
         }
 
-        function loadPlayers() {
-            // Játékosok frissítése a felületen
-            gameContainer.innerHTML = ''; // Töröljük a korábbi játékosokat
-            for (const player in players) {
-                createPlayer(players[player].position.x, players[player].position.y, players[player].color);
+        function movePlayer(player, dx, dy) {
+            const newX = player.position.x + dx;
+            const newY = player.position.y + dy;
+            if (!checkCollision(newX, newY)) {
+                player.position.x = newX;
+                player.position.y = newY;
+                db.ref(`games/${currentGameId}/players/${Object.keys(players)[0]}`).update({ position: player.position });
+                updatePlayerPositionInDOM(player);
             }
+        }
+
+        function checkCollision(x, y) {
+            return walls.some(wall => wall.x === x && wall.y === y);
+        }
+
+        function updatePlayerPositionInDOM(player) {
+            const playerDiv = document.querySelector(`.player[style*="background-color: ${player.color};"]`);
+            if (playerDiv) {
+                playerDiv.style.left = `${player.position.x}px`;
+                playerDiv.style.top = `${player.position.y}px`;
+            }
+        }
+
+        function generateGameId() {
+            return Math.random().toString(36).substring(2, 8);
         }
 
         function getRandomColor() {
@@ -298,10 +295,6 @@
                 color += letters[Math.floor(Math.random() * 16)];
             }
             return color;
-        }
-
-        function generateGameId() {
-            return Math.random().toString(36).substr(2, 5);
         }
     </script>
 </body>
