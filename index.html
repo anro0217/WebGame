@@ -99,8 +99,7 @@
             currentGameId = generateGameId();
             db.ref(`games/${currentGameId}`).set({ players: {}, started: false, creator: username });
             document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
-            enterLobby();
-            addPlayerToLobby(username);
+            enterLobby(username);
         }
 
         function joinGame() {
@@ -114,32 +113,30 @@
                 if (snapshot.exists()) {
                     currentGameId = code;
                     document.getElementById('gameCode').innerText = `Csatlakozási kód: ${currentGameId}`;
-                    enterLobby();
-                    addPlayerToLobby(username);
+                    enterLobby(username);
                 } else {
                     alert('A megadott játék kód nem létezik.');
                 }
             });
         }
 
-        function enterLobby() {
+        function enterLobby(username) {
             document.getElementById('controls').style.display = 'none';
             lobby.style.display = 'block';
-
-            const username = document.getElementById('username').value;
 
             db.ref(`games/${currentGameId}/creator`).once('value').then(snapshot => {
                 const creator = snapshot.val();
                 document.getElementById('startGame').style.display = (username === creator) ? 'block' : 'none';
             });
 
+            addPlayerToLobby(username);
             listenForPlayers();
         }
 
         function addPlayerToLobby(username) {
             const color = getRandomColor();
             playerId = Date.now();
-            players[username] = { id: playerId, position: { x: 50, y: 50 }, color: color };
+            players[username] = { id: playerId, position: { x: 50, y: 50 }, color: color, inGame: false };
             db.ref(`games/${currentGameId}/players/${username}`).set(players[username]);
         }
 
@@ -155,50 +152,46 @@
         }
 
         function startGameFromLobby() {
-    if (currentGameId) {
-        db.ref(`games/${currentGameId}`).update({ started: true })
-            .then(() => {
-                console.log('A játék elindult.');
-                // Update all players in the lobby
-                db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
-                    snapshot.forEach(playerSnapshot => {
-                        const username = playerSnapshot.key;
-                        // Set the player's 'inGame' state to true
-                        db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true });
+            if (currentGameId) {
+                db.ref(`games/${currentGameId}`).update({ started: true })
+                    .then(() => {
+                        console.log('A játék elindult.');
+                        // Set all players' 'inGame' state to true
+                        db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
+                            snapshot.forEach(playerSnapshot => {
+                                const username = playerSnapshot.key;
+                                db.ref(`games/${currentGameId}/players/${username}`).update({ inGame: true });
+                            });
+                        });
+                        listenForGameStart();
+                    })
+                    .catch((error) => {
+                        console.error('Hiba a játék indításakor:', error);
                     });
-                });
-                listenForGameStart(); // Figyelj a játék indítására itt!
-            })
-            .catch((error) => {
-                console.error('Hiba a játék indításakor:', error);
-            });
-    }
-}
+            }
+        }
 
-
-function listenForGameStart() {
-    db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
-        const gameData = snapshot.val();
-        if (gameData && gameData.started) {
-            console.log('A játék elkezdődött');
-            const username = document.getElementById('username').value;
-            // Check if player is marked as 'inGame'
-            db.ref(`games/${currentGameId}/players/${username}`).once('value').then((snapshot) => {
-                const playerData = snapshot.val();
-                if (playerData && playerData.inGame) {
-                    lobby.style.display = 'none'; // Elrejtjük a lobbit
-                    gameContainer.style.display = 'block'; // Megjelenítjük a játékfelületet
-                    startGame(); // Elindítjuk a játékot
+        function listenForGameStart() {
+            db.ref(`games/${currentGameId}`).on('value', (snapshot) => {
+                const gameData = snapshot.val();
+                if (gameData && gameData.started) {
+                    console.log('A játék elkezdődött');
+                    const username = document.getElementById('username').value;
+                    db.ref(`games/${currentGameId}/players/${username}`).once('value').then((snapshot) => {
+                        const playerData = snapshot.val();
+                        if (playerData && playerData.inGame) {
+                            lobby.style.display = 'none'; 
+                            gameContainer.style.display = 'block'; 
+                            startGame();
+                        }
+                    });
                 }
             });
         }
-    });
-}
-
 
         function startGame() {
-            generateMaze(); // Generáljuk a labirintust itt
-            loadPlayers(); // A játékosok betöltése
+            generateMaze();
+            loadPlayers();
             document.addEventListener('keydown', handleKeyPress);
         }
 
@@ -242,46 +235,53 @@ function listenForGameStart() {
         }
 
         function createPlayer(x, y, color) {
-            const playerDiv = document.createElement('div');
-            playerDiv.classList.add('player');
-            playerDiv.style.backgroundColor = color;
-            playerDiv.style.left = `${x}px`;
-            playerDiv.style.top = `${y}px`;
-            gameContainer.appendChild(playerDiv);
+            const playerElement = document.createElement('div');
+            playerElement.classList.add('player');
+            playerElement.style.backgroundColor = color;
+            playerElement.style.left = `${x}px`;
+            playerElement.style.top = `${y}px`;
+            gameContainer.appendChild(playerElement);
         }
 
         function handleKeyPress(event) {
-            if (event.key === 'ArrowUp') {
-                movePlayer(0, -20);
-            } else if (event.key === 'ArrowDown') {
-                movePlayer(0, 20);
-            } else if (event.key === 'ArrowLeft') {
-                movePlayer(-20, 0);
-            } else if (event.key === 'ArrowRight') {
-                movePlayer(20, 0);
+            const username = document.getElementById('username').value;
+            const moveAmount = 20;
+            let x = players[username].position.x;
+            let y = players[username].position.y;
+
+            switch (event.key) {
+                case 'ArrowUp':
+                case 'w':
+                    y -= moveAmount;
+                    break;
+                case 'ArrowDown':
+                case 's':
+                    y += moveAmount;
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                    x -= moveAmount;
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                    x += moveAmount;
+                    break;
+            }
+
+            // Ellenőrizzük a falakat
+            if (!checkWallCollision(x, y)) {
+                players[username].position.x = x;
+                players[username].position.y = y;
+                db.ref(`games/${currentGameId}/players/${username}/position`).set(players[username].position);
             }
         }
 
-        function movePlayer(dx, dy) {
-            const player = document.querySelector('.player');
-            const currentX = parseInt(player.style.left) || 0;
-            const currentY = parseInt(player.style.top) || 0;
-
-            const newX = currentX + dx;
-            const newY = currentY + dy;
-
-            if (!isCollision(newX, newY)) {
-                player.style.left = `${newX}px`;
-                player.style.top = `${newY}px`;
-            }
-        }
-
-        function isCollision(x, y) {
+        function checkWallCollision(x, y) {
             return walls.some(wall => wall.x === x && wall.y === y);
         }
 
         function generateGameId() {
-            return Math.random().toString(36).substr(2, 5);
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
         }
 
         function getRandomColor() {
