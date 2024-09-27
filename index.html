@@ -159,13 +159,11 @@
                 db.ref(`games/${currentGameId}`).update({ started: true })
                     .then(() => {
                         console.log('A játék elindult.');
+                        listenForGameStart();
                     })
                     .catch((error) => {
                         console.error('Hiba a játék indításakor:', error);
                     });
-
-                // Figyeljük a játék elindulását
-                listenForGameStart();
             }
         }
 
@@ -174,28 +172,26 @@
                 const gameData = snapshot.val();
                 if (gameData && gameData.started) {
                     console.log('A játék elkezdődött');
-                    lobby.style.display = 'none';  // Elrejtjük a lobbit
-                    gameContainer.style.display = 'block';  // Megjelenítjük a játékfelületet
-                    startGame();  // Elindítjuk a játékot
+                    lobby.style.display = 'none'; // Elrejtjük a lobbit
+                    gameContainer.style.display = 'block'; // Megjelenítjük a játékfelületet
+                    startGame(); // Elindítjuk a játékot
                 }
             });
         }
 
         function startGame() {
-            generateMaze();
-            db.ref(`games/${currentGameId}/players`).on('value', (snapshot) => {
-                gameContainer.innerHTML = '';
-                playerList.innerHTML = '';
+            generateMaze(); // Generáljuk a labirintust itt
+            loadPlayers(); // A játékosok betöltése
+            document.addEventListener('keydown', handleKeyPress);
+        }
+
+        function loadPlayers() {
+            db.ref(`games/${currentGameId}/players`).once('value').then((snapshot) => {
                 snapshot.forEach(playerSnapshot => {
                     const playerData = playerSnapshot.val();
                     createPlayer(playerData.position.x, playerData.position.y, playerData.color);
-                    const playerName = document.createElement('p');
-                    playerName.innerText = `${playerSnapshot.key} - Szín: ${playerData.color}`;
-                    playerList.appendChild(playerName);
                 });
             });
-
-            document.addEventListener('keydown', handleKeyPress);
         }
 
         function generateMaze() {
@@ -250,18 +246,16 @@
         }
 
         function movePlayer(dx, dy) {
-            const playerData = players[document.getElementById('username').value];
-            if (playerData) {
-                const newX = playerData.position.x + dx;
-                const newY = playerData.position.y + dy;
+            const player = document.querySelector('.player');
+            const currentX = parseInt(player.style.left) || 0;
+            const currentY = parseInt(player.style.top) || 0;
 
-                if (!isCollision(newX, newY)) {
-                    playerData.position.x = newX;
-                    playerData.position.y = newY;
-                    db.ref(`games/${currentGameId}/players/${document.getElementById('username').value}`).update({
-                        position: playerData.position
-                    });
-                }
+            const newX = currentX + dx;
+            const newY = currentY + dy;
+
+            if (!isCollision(newX, newY)) {
+                player.style.left = `${newX}px`;
+                player.style.top = `${newY}px`;
             }
         }
 
