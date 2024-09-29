@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lobby</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <div id="lobby">
+        <h2>Lobby</h2>
+        <div id="gameInfo">
+            <div id="joinCodeDisplay"></div>
+            <div id="playerCount"></div>
+        </div>
+        <div id="playerList"></div>
+        <select id="gameMode">
+            <option value="maze">Labirintus</option>
+            <!-- További játékmódok -->
+        </select>
+        <button id="startGame" style="display:none;">Játék indítása</button>
+    </div>
+    <script type="module" src="lobby/lobby.js"></script>
+</body>
+</html>
